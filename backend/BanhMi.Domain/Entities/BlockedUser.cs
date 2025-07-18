@@ -7,6 +7,6 @@ public class BlockedUser
     public DateTime CreatedAt { get; set; }
 
     // Navigation properties
-    public User User { get; set; } = new User();
-    public User BlockUser { get; set; } = new User();
+    public User User { get; set; }
+    public User BlockUser { get; set; }
 }

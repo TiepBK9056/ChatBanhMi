@@ -8,6 +8,6 @@ public class MessageStatus
     public DateTime UpdatedAt { get; set; }
 
     // Navigation properties
-    public Message Message { get; set; } = new Message();
-    public User Receiver { get; set; } = new User();
+    public Message Message { get; set; }
+    public User Receiver { get; set; } 
 }

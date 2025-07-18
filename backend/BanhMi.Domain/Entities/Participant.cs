@@ -8,6 +8,6 @@ public class Participant
     public DateTime JoinedAt { get; set; }
 
     // Navigation properties
-    public Conversation Conversation { get; set; } = new Conversation();
-    public User User { get; set; } = new User();
+    public Conversation Conversation { get; set; }
+    public User User { get; set; }
 }

@@ -1,6 +1,9 @@
-using Microsoft.EntityFrameworkCore;
-using BanhMi.Domain.Entities;
+// BanhMi.Infrastructure/Persistence/Repositories/MessageRepository.cs
 using BanhMi.Application.Interfaces.Repositories;
+using BanhMi.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace BanhMi.Infrastructure.Persistence.Repositories
 {
@@ -13,6 +16,29 @@ namespace BanhMi.Infrastructure.Persistence.Repositories
             _dbContext = dbContext;
         }
 
+        public async Task<Message?> GetLastMessageByConversationIdAsync(int conversationId)
+        {
+            return await _dbContext.Messages
+                .Where(m => m.ConversationId == conversationId)
+                .OrderByDescending(m => m.CreatedAt)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<int> GetUnreadCountAsync(int conversationId, int userId)
+        {
+            return await _dbContext.MessageStatuses
+                .Join(
+                    _dbContext.Messages,
+                    ms => ms.MessageId,
+                    m => m.MessageId,
+                    (ms, m) => new { MessageStatus = ms, Message = m }
+                )
+                .Where(joined => joined.Message.ConversationId == conversationId 
+                             && joined.MessageStatus.ReceiverId == userId 
+                             && joined.MessageStatus.Status != "read")
+                .CountAsync();
+        }
+
         public async Task<Message> AddAsync(Message message)
         {
             _dbContext.Messages.Add(message);
@@ -20,7 +46,7 @@ namespace BanhMi.Infrastructure.Persistence.Repositories
             return message;
         }
 
-        public async Task<Message> GetByIdAsync(int messageId)
+        public async Task<Message?> GetByIdAsync(int messageId)
         {
             return await _dbContext.Messages.FindAsync(messageId);
         }

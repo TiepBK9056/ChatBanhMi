@@ -10,5 +10,5 @@ public class Notification
     public bool IsSeen { get; set; }
 
     // Navigation property
-    public User User { get; set; } = new User();
+    public User User { get; set; }
 }

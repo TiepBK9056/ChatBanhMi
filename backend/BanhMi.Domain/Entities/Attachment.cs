@@ -9,5 +9,5 @@ public class Attachment
     public DateTime UploadedAt { get; set; }
 
     // Navigation property
-    public Message Message { get; set; } = new Message();
+    public Message Message { get; set; } 
 }

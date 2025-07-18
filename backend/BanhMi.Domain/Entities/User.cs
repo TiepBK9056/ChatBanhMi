@@ -12,5 +12,5 @@ public class User
     public bool IsVerified { get; set; }
 
     // Navigation property
-    public List<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public List<RefreshToken> RefreshTokens { get; set; }
 }

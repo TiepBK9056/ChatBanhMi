@@ -9,8 +9,8 @@ public class Message
     public bool IsRead { get; set; }
 
     // Navigation properties
-    public Conversation Conversation { get; set; } = new Conversation();
-    public User Sender { get; set; } = new User();
-    public List<Attachment> Attachments { get; set; } = new List<Attachment>();
-    public List<MessageStatus> MessageStatuses { get; set; } = new List<MessageStatus>();
+    public Conversation Conversation { get; set; }
+    public User Sender { get; set; }
+    public List<Attachment> Attachments { get; set; } 
+    public List<MessageStatus> MessageStatuses { get; set; }
 }

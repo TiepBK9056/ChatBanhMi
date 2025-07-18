@@ -4,10 +4,13 @@ using BanhMi.API.Filters;
 using BanhMi.Application.CommandHandler;
 using BanhMi.Application.Interfaces;
 using BanhMi.Application.Interfaces.Repositories;
+using BanhMi.Application.Queries.Conversations;
 using BanhMi.Application.QueryHandlers;
 using BanhMi.Infrastructure.Persistence;
 using BanhMi.Infrastructure.Persistence.Repositories;
 using BanhMi.Infrastructure.Services;
+using Ecommerce.Application.Interfaces.Services;
+using Ecommerce.Infrastructure.Services;
 using Ecommere.Application.Common;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -66,16 +69,22 @@ builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IRedisService, RedisService>();
 
+// Add the ICurrentUserService registration
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
 // Register Khởi tạo admin
 builder.Services.AddScoped<AdminInitializer>();
-
+builder.Services.AddMediatR(cfg => 
+    cfg.RegisterServicesFromAssembly(typeof(GetConversationsQuery).Assembly));
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(builder.Configuration["Redis:Connection"]));
 builder.Services.AddLogging(logging => logging.AddConsole());
 
 // register message
-builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
 builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
-
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 // Register MediatR 
 
 
@@ -83,6 +92,8 @@ builder.Services.AddScoped<IParticipantRepository, ParticipantRepository>();
 
 // Register additional repositories
 
+// Register user
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 
 /// ************** ------------------------------ Swagger-Start-----------------------------------///*********************

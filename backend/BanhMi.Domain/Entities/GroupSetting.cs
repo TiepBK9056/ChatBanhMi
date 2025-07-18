@@ -8,5 +8,5 @@ public class GroupSetting
     public DateTime UpdatedAt { get; set; }
 
     // Navigation property
-    public Conversation Conversation { get; set; } = new Conversation();
+    public Conversation Conversation { get; set; }
 }

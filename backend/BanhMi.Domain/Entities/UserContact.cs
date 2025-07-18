@@ -9,6 +9,6 @@ public class UserContact
     public bool IsBlocked { get; set; }
 
     // Navigation properties
-    public User User { get; set; } = new User();
-    public User Friend { get; set; } = new User();
+    public User User { get; set; }
+    public User Friend { get; set; }
 }

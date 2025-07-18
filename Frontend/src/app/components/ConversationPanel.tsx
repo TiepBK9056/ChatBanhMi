@@ -1,62 +1,123 @@
+// ClientApp/app/components/ConversationPanel.tsx
 "use client";
 import { FaSearch, FaUserPlus, FaUserFriends } from 'react-icons/fa';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
-// Định nghĩa kiểu cho Conversation
-type Conversation = {
+interface Conversation {
   id: string;
   name: string;
   preview: string;
   time: string;
   unread: number;
   online: boolean;
-};
+  avatarUrl?: string;
+}
 
-// Định nghĩa kiểu cho props
-type ConversationPanelProps = {
+interface ConversationApiResponse {
+  conversationId: number;
+  name: string;
+  isGroup: boolean;
+  preview: string;
+  time: string; // Hoặc Date nếu backend trả về định dạng ISO
+  unreadCount: number;
+  avatarUrl?: string;
+}
+
+interface ConversationPanelProps {
   onSelectConversation: (conversation: Conversation) => void;
-};
+}
 
 export default function ConversationPanel({ onSelectConversation }: ConversationPanelProps) {
-  const [selectedTab, setSelectedTab] = useState('Tất cả');
-  const [selectedConversationId, setSelectedConversationId] = useState('conv1');
+  const [selectedTab, setSelectedTab] = useState<'Tất cả' | 'Chưa đọc'>('Tất cả');
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const userId = localStorage.getItem('userId') ?? '1';
 
-  const conversations: Conversation[] = [
-    {
-      id: 'conv1',
-      name: 'Nguyễn Văn A',
-      preview: 'Hôm nay đi cafe không?',
-      time: '10:30',
-      unread: 3,
-      online: true,
-    },
-    {
-      id: 'conv2',
-      name: 'Cloud của tôi',
-      preview: 'Chưa có tin nhắn',
-      time: 'Hôm qua',
-      unread: 0,
-      online: false,
-    },
-    {
-      id: 'conv3',
-      name: 'Trần Văn B',
-      preview: 'Đã xem',
-      time: '09:00',
-      unread: 1,
-      online: true,
-    },
-  ];
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        });
+        const fetchedConversations: Conversation[] = response.data.map((conv: ConversationApiResponse) => ({
+          id: conv.conversationId.toString(),
+          name: conv.name,
+          preview: conv.preview,
+          time: new Date(conv.time).toLocaleTimeString('vi-VN'),
+          unread: conv.unreadCount,
+          online: false, // Sẽ xử lý bằng SignalR sau
+          avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
+        }));
+        setConversations(fetchedConversations);
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+      }
+    };
+
+    fetchConversations();
+  }, []);
 
   const filteredConversations = selectedTab === 'Tất cả'
-    ? conversations
-    : conversations.filter(conv => conv.unread > 0);
+    ? conversations.filter((conv) =>
+        conv.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : conversations.filter((conv) => conv.unread > 0);
 
   const handleSelectConversation = (convId: string) => {
     setSelectedConversationId(convId);
-    const selectedConv = conversations.find(conv => conv.id === convId);
+    const selectedConv = conversations.find((conv) => conv.id === convId);
     if (selectedConv) {
       onSelectConversation(selectedConv);
+    }
+  };
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleAddFriend = async () => {
+    const friendId = prompt('Nhập ID người dùng để thêm bạn');
+    if (!friendId) return;
+    try {
+      await axios.post(
+        'http://localhost:5130/api/contacts',
+        { userId, friendId },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } }
+      );
+      alert('Yêu cầu kết bạn đã được gửi!');
+    } catch (error) {
+      console.error('Error adding friend:', error);
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    const groupName = prompt('Nhập tên nhóm:');
+    const participantIdsInput = prompt('Nhập danh sách userId (cách nhau bởi dấu phẩy):');
+    if (!groupName || !participantIdsInput) return;
+    const participantIds = participantIdsInput.split(',').map(Number).filter(id => !isNaN(id));
+    try {
+      await axios.post(
+        'http://localhost:5130/api/conversations',
+        { conversationName: groupName, isGroup: true, participantIds },
+        { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } }
+      );
+      alert('Nhóm đã được tạo!');
+      const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+      });
+      setConversations(response.data.map((conv: ConversationApiResponse) => ({
+        id: conv.conversationId.toString(),
+        name: conv.name,
+        preview: conv.preview,
+        time: new Date(conv.time).toLocaleTimeString('vi-VN'),
+        unread: conv.unreadCount,
+        online: false,
+        avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
+      })));
+    } catch (error) {
+      console.error('Error creating group:', error);
     }
   };
 
@@ -70,12 +131,14 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
             type="text"
             placeholder="Tìm kiếm bạn bè, nhóm..."
             className="text-main"
+            value={searchQuery}
+            onChange={handleSearch}
           />
         </div>
-        <button className="input-btn" title="Thêm bạn">
+        <button className="input-btn" title="Thêm bạn" onClick={handleAddFriend}>
           <FaUserPlus />
         </button>
-        <button className="input-btn" title="Tạo nhóm">
+        <button className="input-btn" title="Tạo nhóm" onClick={handleCreateGroup}>
           <FaUserFriends />
         </button>
       </div>
@@ -105,7 +168,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
             <div className="conv-avatar">
               <img
                 alt="Avatar"
-                src="https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg"
+                src={conv.avatarUrl}
                 className="avatar-img"
               />
               {conv.online && <div className="conv-status online"></div>}

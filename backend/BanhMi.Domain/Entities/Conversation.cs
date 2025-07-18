@@ -6,9 +6,10 @@ public class Conversation
     public string ConversationName { get; set; } = string.Empty;
     public bool IsGroup { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string avartarUrl { get; set; }
 
     // Navigation properties
-    public List<Message> Messages { get; set; } = new List<Message>();
-    public List<Participant> Participants { get; set; } = new List<Participant>();
-    public List<GroupSetting> GroupSettings { get; set; } = new List<GroupSetting>();
+    public List<Message> Messages { get; set; } 
+    public List<Participant> Participants { get; set; }
+    public List<GroupSetting> GroupSettings { get; set; }
 }
