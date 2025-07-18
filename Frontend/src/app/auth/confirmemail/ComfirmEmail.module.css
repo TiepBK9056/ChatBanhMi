@@ -1,0 +1,175 @@
+.main-cofirm-email {
+    margin-top: 50px;
+}
+
+.container {
+    width: 100%;
+    max-width: 400px;
+    margin: 50px auto;
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.back-button {
+    background: none;
+    border: none;
+    font-size: 1.5em;
+    color: #000;
+    cursor: pointer;
+    margin-bottom: 20px;
+    padding: 0;
+    background-color: #f03248;
+}
+
+.main-cofirm-email h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 1.8em;
+}
+
+.otp-description {
+    text-align: center;
+    color: #777;
+    margin-bottom: 30px;
+}
+
+.otp-input-container {
+    display: flex;
+    justify-content: center;
+}
+
+.otp-input {
+    width: 40px;
+    height: 40px;
+    text-align: center;
+    margin: 5px;
+    border: none;
+    border-bottom: 2px solid #ccc;
+    outline: none;
+    font-size: 1.2em;
+    maxlength: 1;
+}
+
+.otp-input:focus {
+    border-bottom-color: #007bff;
+}
+
+.resend-otp {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.resend-otp a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.resend-otp a:hover {
+    text-decoration: underline;
+}
+
+.next-button {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    margin-top: 30px;
+    background-color: #ea6959;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.next-button:hover {
+    background-color: #d05b4d;
+}
+
+.steps {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #ccc;
+    position: relative;
+}
+
+.step:not(:last-child):after {
+    content: "";
+    position: absolute;
+    top: 15px;
+    left: 102%;
+    margin-left: 5px;
+    border-top: 2px solid #ccc;
+    border-right: 2px solid #ccc;
+    width: 8px;
+    height: 8px;
+    transform: translateY(-50%) translateX(-50%) rotate(45deg);
+    z-index: 1;
+}
+
+.step:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    left: 147px;
+    margin-left: 5px;
+    width: 50px;
+    height: 2px;
+    z-index: 1;
+    background-color: #ccc;
+}
+
+.step-circle {
+    margin: 0 80px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 2px solid #ccc;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.step-active .step-circle {
+    border-color: #4CAF50;
+    background-color: #4CAF50;
+    color: white;
+}
+
+.step-active {
+    color: #4CAF50;
+}
+
+.number {
+    text-align: center;
+}
+
+.step-line {
+    display: absolute;
+    height: 10px;
+    background-color: #ccc;
+    width: 20px;
+    top: 10px;
+}
+
+.faArrowLeft {
+    color: red;
+    font-size: 20px;
+    padding: 4px 10px;
+    border-radius: 10px;
+    transition: all 0.5s ease-in-out;
+}
+.faArrowLeft:hover {
+    cursor: pointer;
+    outline: 1px solid #ccc;
+}
