@@ -8,6 +8,7 @@ using BanhMi.Application.Queries.Conversations;
 using BanhMi.Application.QueryHandlers;
 using BanhMi.Infrastructure.Persistence;
 using BanhMi.Infrastructure.Persistence.Repositories;
+using BanhMi.Infrastructure.Repositories;
 using BanhMi.Infrastructure.Services;
 using Ecommerce.Application.Interfaces.Services;
 using Ecommerce.Infrastructure.Services;
@@ -79,6 +80,9 @@ builder.Services.AddMediatR(cfg =>
     cfg.RegisterServicesFromAssembly(typeof(GetConversationsQuery).Assembly));
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(builder.Configuration["Redis:Connection"]));
 builder.Services.AddLogging(logging => logging.AddConsole());
+
+//register contact
+builder.Services.AddScoped<IUserContactRepository, UserContactRepository>();
 
 // register message
 builder.Services.AddScoped<IConversationRepository, ConversationRepository>();

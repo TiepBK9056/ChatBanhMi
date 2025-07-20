@@ -18,5 +18,11 @@ namespace BanhMi.Infrastructure.Persistence.Repositories
         {
             return await _dbContext.Users.FindAsync(userId);
         }
+        public async Task<List<User>> SearchByPhoneNumberAsync(string phoneNumber)
+        {
+            return await _dbContext.Users
+                .Where(u => u.PhoneNumber.Contains(phoneNumber))
+                .ToListAsync();
+        }
     }
 }

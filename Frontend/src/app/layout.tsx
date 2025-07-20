@@ -1,4 +1,5 @@
 "use client";
+import { Toaster } from 'react-hot-toast';
 import './globals.css';
 import { AuthProvider } from '@/app/context/AuthContext';
 
@@ -14,6 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           {children}
         </AuthProvider>
+        <Toaster position="top-right" reverseOrder={false} />
       </body>
     </html>
   );

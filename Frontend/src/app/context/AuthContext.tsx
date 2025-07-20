@@ -1,8 +1,9 @@
-'use client';
+"use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
 interface User {
+  userId: number;
   name: string;
   email: string;
   avatarUrl?: string;
@@ -60,9 +61,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userData = await userResponse.json();
           setIsLoggedIn(true);
           setUser({
-            name: `${userData.firstName} ${userData.lastName}`,
+            userId: userData.id,
+            name: `${userData.firstName} ${userData.lastName}`.trim(),
             email: userData.email,
-            avatarUrl: userData.avatarUrl || "https://example.com/default-avatar.png",
+            avatarUrl: userData.avatarUrl || "https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg",
           });
         } else {
           throw new Error("Failed to fetch user data after refresh");
@@ -102,9 +104,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userData = await response.json();
           setIsLoggedIn(true);
           setUser({
-            name: `${userData.firstName} ${userData.lastName}`,
+            userId: userData.id,
+            name: `${userData.firstName} ${userData.lastName}`.trim(),
             email: userData.email,
-            avatarUrl: userData.avatarUrl || "https://example.com/default-avatar.png",
+            avatarUrl: userData.avatarUrl || "https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg",
           });
         } else if (response.status === 401) {
           await refreshToken();

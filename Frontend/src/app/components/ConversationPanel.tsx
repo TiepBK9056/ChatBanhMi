@@ -1,8 +1,10 @@
-// ClientApp/app/components/ConversationPanel.tsx
 "use client";
 import { FaSearch, FaUserPlus, FaUserFriends } from 'react-icons/fa';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { useRouter } from 'next/navigation';
+import AddFriendModal from './AddFriendModal';
 
 interface Conversation {
   id: string;
@@ -19,7 +21,7 @@ interface ConversationApiResponse {
   name: string;
   isGroup: boolean;
   preview: string;
-  time: string; // Hoặc Date nếu backend trả về định dạng ISO
+  time: string;
   unreadCount: number;
   avatarUrl?: string;
 }
@@ -33,13 +35,24 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const userId = localStorage.getItem('userId') ?? '1';
+  const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
+  const { isLoggedIn, user } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
+    if (!isLoggedIn || !user) {
+      router.push('/auth/login');
+      return;
+    }
+
     const fetchConversations = async () => {
       try {
+        const accessToken = localStorage.getItem('accessToken');
+        if (!accessToken) {
+          throw new Error('No access token found');
+        }
         const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
         const fetchedConversations: Conversation[] = response.data.map((conv: ConversationApiResponse) => ({
           id: conv.conversationId.toString(),
@@ -47,7 +60,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
           preview: conv.preview,
           time: new Date(conv.time).toLocaleTimeString('vi-VN'),
           unread: conv.unreadCount,
-          online: false, // Sẽ xử lý bằng SignalR sau
+          online: false,
           avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
         }));
         setConversations(fetchedConversations);
@@ -57,7 +70,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
     };
 
     fetchConversations();
-  }, []);
+  }, [isLoggedIn, user, router]);
 
   const filteredConversations = selectedTab === 'Tất cả'
     ? conversations.filter((conv) =>
@@ -77,35 +90,50 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
     setSearchQuery(e.target.value);
   };
 
-  const handleAddFriend = async () => {
-    const friendId = prompt('Nhập ID người dùng để thêm bạn');
-    if (!friendId) return;
+  const handleAddFriend = async (friendId: number) => {
+    if (!isLoggedIn || !user) {
+      router.push('/auth/login');
+      return;
+    }
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
       await axios.post(
         'http://localhost:5130/api/contacts',
-        { userId, friendId },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } }
+        { userId: user.userId, friendId },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       alert('Yêu cầu kết bạn đã được gửi!');
     } catch (error) {
       console.error('Error adding friend:', error);
+      throw error;
     }
   };
 
   const handleCreateGroup = async () => {
+    if (!isLoggedIn || !user) {
+      router.push('/auth/login');
+      return;
+    }
     const groupName = prompt('Nhập tên nhóm:');
     const participantIdsInput = prompt('Nhập danh sách userId (cách nhau bởi dấu phẩy):');
     if (!groupName || !participantIdsInput) return;
     const participantIds = participantIdsInput.split(',').map(Number).filter(id => !isNaN(id));
     try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
       await axios.post(
         'http://localhost:5130/api/conversations',
-        { conversationName: groupName, isGroup: true, participantIds },
-        { headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` } }
+        { conversationName: groupName, isGroup: true, participantIds: [...participantIds, user.userId] },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       alert('Nhóm đã được tạo!');
       const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       setConversations(response.data.map((conv: ConversationApiResponse) => ({
         id: conv.conversationId.toString(),
@@ -135,7 +163,11 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
             onChange={handleSearch}
           />
         </div>
-        <button className="input-btn" title="Thêm bạn" onClick={handleAddFriend}>
+        <button
+          className="input-btn"
+          title="Thêm bạn"
+          onClick={() => setIsAddFriendModalOpen(true)}
+        >
           <FaUserPlus />
         </button>
         <button className="input-btn" title="Tạo nhóm" onClick={handleCreateGroup}>
@@ -184,6 +216,11 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
           </div>
         ))}
       </div>
+      <AddFriendModal
+        isOpen={isAddFriendModalOpen}
+        onClose={() => setIsAddFriendModalOpen(false)}
+        onAddFriend={handleAddFriend}
+      />
     </div>
   );
 }

@@ -46,7 +46,7 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
 
   return (
     <div id="chatArea" className="flex-1 flex flex-col bg-background">
-      <div className="chat-header p-4 bg-sidebar border-b border-gray-200 flex items-center gap-3">
+      <div className="chat-header p-4 bg-sidebar flex items-center gap-3">
         <div className="chat-avatar">
           <img
             alt="Avatar"
