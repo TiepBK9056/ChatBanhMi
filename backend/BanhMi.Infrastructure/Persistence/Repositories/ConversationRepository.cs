@@ -25,5 +25,15 @@ namespace BanhMi.Infrastructure.Persistence.Repositories
                     (p, c) => c)
                 .ToListAsync();
         }
+        public async Task<List<Conversation>> GetConversationsByUserIdAsync(int userId)
+        {
+            return await _dbContext.Conversations
+                .Include(c => c.Participants)
+                .ThenInclude(p => p.User)
+                .Include(c => c.Messages.OrderByDescending(m => m.CreatedAt).Take(1))
+                .Where(c => c.Participants.Any(p => p.UserId == userId))
+                .OrderByDescending(c => c.Messages.Any() ? c.Messages.Max(m => m.CreatedAt) : c.CreatedAt)
+                .ToListAsync();
+        }
     }
 }

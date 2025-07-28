@@ -21,7 +21,7 @@ interface ConversationApiResponse {
   name: string;
   isGroup: boolean;
   preview: string;
-  time: string;
+  time: string; // Chuỗi ISO 8601
   unreadCount: number;
   avatarUrl?: string;
 }
@@ -51,19 +51,19 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         if (!accessToken) {
           throw new Error('No access token found');
         }
-        const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations', {
+        const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations/user', {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         const fetchedConversations: Conversation[] = response.data.map((conv: ConversationApiResponse) => ({
           id: conv.conversationId.toString(),
           name: conv.name,
           preview: conv.preview,
-          time: new Date(conv.time).toLocaleTimeString('vi-VN'),
+          time: new Date(conv.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           unread: conv.unreadCount,
           online: false,
           avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
         }));
-        setConversations(fetchedConversations);
+        setConversations(fetchedConversations.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()));
       } catch (error) {
         console.error('Error fetching conversations:', error);
       }
@@ -74,7 +74,8 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
 
   const filteredConversations = selectedTab === 'Tất cả'
     ? conversations.filter((conv) =>
-        conv.name.toLowerCase().includes(searchQuery.toLowerCase())
+        conv.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        conv.preview.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : conversations.filter((conv) => conv.unread > 0);
 
@@ -132,14 +133,14 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       alert('Nhóm đã được tạo!');
-      const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations', {
+      const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations/user', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       setConversations(response.data.map((conv: ConversationApiResponse) => ({
         id: conv.conversationId.toString(),
         name: conv.name,
         preview: conv.preview,
-        time: new Date(conv.time).toLocaleTimeString('vi-VN'),
+        time: new Date(conv.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         unread: conv.unreadCount,
         online: false,
         avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
@@ -189,7 +190,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         </span>
       </div>
       <div className="divider"></div>
-      <div className="conv-list flex-1 overflow-y-auto" key={selectedTab}>
+      <div className="conv-list flex-1 overflow-y-auto">
         {filteredConversations.map((conv) => (
           <div
             key={conv.id}

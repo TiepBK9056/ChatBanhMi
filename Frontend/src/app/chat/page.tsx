@@ -12,11 +12,7 @@ type Conversation = {
 };
 
 export default function ChatPage() {
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>({
-    id: 'conv1',
-    name: 'Nguyễn Văn A',
-    online: true,
-  });
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
 
   return (
     <div className="flex h-screen">

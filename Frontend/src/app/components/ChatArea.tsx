@@ -1,11 +1,16 @@
 "use client";
 import { FaPaperclip, FaSmile, FaPaperPlane } from 'react-icons/fa';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 
-// Định nghĩa kiểu cho Message
+// Định nghĩa kiểu cho Message (cập nhật để khớp với response từ API)
 type Message = {
-  id: string;
-  text: string;
-  type: 'sent' | 'received';
+  messageId: number;
+  conversationId: number;
+  senderId: number;
+  content: string;
+  createdAt: string;
+  isRead: boolean;
 };
 
 // Định nghĩa kiểu cho Conversation
@@ -21,29 +26,49 @@ type ChatAreaProps = {
 };
 
 export default function ChatArea({ selectedConversation }: ChatAreaProps) {
-  // Dữ liệu tin nhắn giả lập cho từng người dùng
-  const messageData: Record<string, Message[]> = {
-    conv1: [
-      { id: '1', text: 'Hôm nay đi chơi hồng tỷ không?', type: 'received' },
-      { id: '2', text: 'OK, 3h chiều nhé!', type: 'sent' },
-      { id: '3', text: 'Tuyệt, hẹn gặp ở quán quen!', type: 'received' },
-      { id: '4', text: '👍', type: 'sent' },
-      { id: '5', text: 'oke em thắng', type: 'received' },
-      { id: '6', text: 'Đêm qua em tuyệt quá thắng ơi', type: 'sent' },
-    ],
-    conv2: [
-      { id: '1', text: 'Chào bạn, lâu rồi không chat!', type: 'received' },
-      { id: '2', text: 'Ừ, bận quá! Hôm nào gặp nhé?', type: 'sent' },
-    ],
-    conv3: [
-      { id: '1', text: 'Bạn ơi, tối nay rảnh không?', type: 'received' },
-      { id: '2', text: 'Rảnh, đi ăn nhé?', type: 'sent' },
-      { id: '3', text: 'OK, 7h tối nha!', type: 'received' },
-    ],
-  };
+  const [messages, setMessages] = useState<Message[]>([]);
 
-  const messages = selectedConversation ? messageData[selectedConversation.id] || [] : [];
+  useEffect(() => {
+    const fetchMessages = async () => {
+      // Chỉ gọi API nếu selectedConversation tồn tại và id là số hợp lệ
+      if (!selectedConversation || isNaN(parseInt(selectedConversation.id))) {
+        setMessages([]);
+        return;
+      }
 
+      try {
+        const accessToken = localStorage.getItem('accessToken');
+        if (!accessToken) {
+          throw new Error('No access token found');
+        }
+
+        const response = await axios.get<Message[]>(
+          `http://localhost:5130/api/Messages?conversationId=${parseInt(selectedConversation.id)}`,
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+
+        setMessages(response.data);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        setMessages([]);
+      }
+    };
+
+    fetchMessages();
+  }, [selectedConversation]);
+
+  // Nếu chưa chọn cuộc trò chuyện, hiển thị thông điệp chào mừng ở trung tâm
+  if (!selectedConversation) {
+    return (
+      <div id="chatArea" className="flex-1 flex flex-col bg-background justify-center items-center">
+        <h2 className="text-2xl font-bold text-gray-600">Chào mừng đến với chat</h2>
+      </div>
+    );
+  }
+
+  // Nếu đã chọn cuộc trò chuyện, hiển thị giao diện hiện tại
   return (
     <div id="chatArea" className="flex-1 flex flex-col bg-background">
       <div className="chat-header p-4 bg-sidebar flex items-center gap-3">
@@ -56,14 +81,14 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
           <div className="chat-status online"></div>
         </div>
         <div className="chat-info">
-          <div className="chat-name">{selectedConversation?.name || 'Chọn một cuộc trò chuyện'}</div>
-          <div className="chat-status-text">{selectedConversation?.online ? 'Online' : 'Offline'}</div>
+          <div className="chat-name">{selectedConversation.name}</div>
+          <div className="chat-status-text">{selectedConversation.online ? 'Online' : 'Offline'}</div>
         </div>
       </div>
       <div className="chat-messages flex-1 p-6 overflow-y-auto flex flex-col">
         {messages.map((msg) => (
-          <div key={msg.id} className={`message ${msg.type}`}>
-            {msg.text}
+          <div key={msg.messageId} className={`message ${msg.senderId === 8 ? 'sent' : 'received'}`}>
+            {msg.content}
           </div>
         ))}
         {messages.length === 0 && <div className="text-center text-gray-500">Chưa có tin nhắn</div>}

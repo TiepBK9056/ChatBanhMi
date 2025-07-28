@@ -16,6 +16,19 @@ namespace BanhMi.Infrastructure.Persistence.Repositories
             _dbContext = dbContext;
         }
 
+        public async Task<List<Message>> GetByConversationIdAsync(int conversationId)
+        {
+            return await _dbContext.Messages
+                .Where(m => m.ConversationId == conversationId)
+                .OrderBy(m => m.CreatedAt)
+                .ToListAsync();
+        }
+        public async Task AddStatusesAsync(List<MessageStatus> statuses)
+        {
+            await _dbContext.MessageStatuses.AddRangeAsync(statuses);
+            await _dbContext.SaveChangesAsync();
+        }
+
         public async Task<Message?> GetLastMessageByConversationIdAsync(int conversationId)
         {
             return await _dbContext.Messages

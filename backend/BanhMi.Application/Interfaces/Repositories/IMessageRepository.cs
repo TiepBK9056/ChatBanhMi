@@ -12,5 +12,7 @@ namespace BanhMi.Application.Interfaces.Repositories
         Task UpdateStatusAsync(MessageStatus status);
         Task<Message?> GetLastMessageByConversationIdAsync(int conversationId);
         Task<int> GetUnreadCountAsync(int conversationId, int userId);
+        Task<List<Message>> GetByConversationIdAsync(int conversationId);
+        Task AddStatusesAsync(List<MessageStatus> statuses);
     }
 }
