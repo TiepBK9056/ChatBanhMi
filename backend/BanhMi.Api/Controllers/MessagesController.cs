@@ -5,12 +5,13 @@ using BanhMi.Application.Queries.Messages;
 using Ecommerce.Application.Interfaces.Services;
 using System;
 using System.Threading.Tasks;
+using BanhMi.Application.Commands.Messages;
 
 namespace BanhMi.Api.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    
+
     public class MessagesController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -61,5 +62,16 @@ namespace BanhMi.Api.Controllers
                 return StatusCode(500, new { message = "An error occurred while fetching messages", details = ex.Message });
             }
         }
+
+        
+
+        [HttpPost("{messageId}/read")]
+        public async Task<IActionResult> MarkMessageAsRead(int messageId)
+        {
+            var command = new MarkMessageAsReadCommand { MessageId = messageId }; // Giả định có command này
+            await _mediator.Send(command);
+            return Ok();
+        }
+
     }
 }

@@ -18,9 +18,10 @@ interface AddFriendModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddFriend: (friendId: number) => Promise<void>;
+  onStartChat: (convId: number) => void;
 }
 
-export default function AddFriendModal({ isOpen, onClose, onAddFriend }: AddFriendModalProps) {
+export default function AddFriendModal({ isOpen, onClose, onAddFriend, onStartChat }: AddFriendModalProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -86,10 +87,31 @@ export default function AddFriendModal({ isOpen, onClose, onAddFriend }: AddFrie
         },
       });
       onClose();
-    } catch  {
+    } catch {
       const errorMessage = 'Không thể gửi yêu cầu kết bạn';
       toast.error(errorMessage);
       setError(errorMessage);
+    }
+  };
+
+  const handleStartChat = async (friendId: number) => {
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
+      const response = await axios.post(
+        'http://localhost:5130/api/conversations/direct',
+        { targetUserId: friendId },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const conversationId = response.data;
+      onStartChat(conversationId);
+      onClose();
+      toast.success('Đã mở cuộc hội thoại!');
+    } catch (error) {
+      toast.error('Không thể tạo cuộc hội thoại');
+      console.error('Error starting chat:', error);
     }
   };
 
@@ -113,7 +135,7 @@ export default function AddFriendModal({ isOpen, onClose, onAddFriend }: AddFrie
             onChange={(e) => setPhoneNumber(e.target.value)}
             placeholder="Số điện thoại"
             className="w-full p-2 border rounded"
-            style={{border: "1px solid rgb(141 139 154)"}}
+            style={{ border: "1px solid rgb(141 139 154)" }}
           />
         </div>
         {error && (
@@ -124,7 +146,8 @@ export default function AddFriendModal({ isOpen, onClose, onAddFriend }: AddFrie
             {searchResults.map((result) => (
               <div
                 key={result.id}
-                className="flex items-center justify-between p-2"
+                className="flex items-center justify-between p-2 cursor-pointer hover:bg-gray-100"
+                onClick={() => handleStartChat(result.id)}
               >
                 <div className="flex items-center">
                   <img
@@ -143,7 +166,10 @@ export default function AddFriendModal({ isOpen, onClose, onAddFriend }: AddFrie
                   <p className="text-sm text-blue-500">Đang chờ đồng ý</p>
                 ) : (
                   <button
-                    onClick={() => handleAddFriendClick(result.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddFriendClick(result.id);
+                    }}
                     className="p-2 bg-green-500 text-white rounded"
                   >
                     Kết bạn
@@ -154,23 +180,23 @@ export default function AddFriendModal({ isOpen, onClose, onAddFriend }: AddFrie
           </div>
         )}
         <div className="mt-auto">
-            <hr className="border-t border-gray-300 mb-4" />
-            <div className="flex justify-end gap-2">
-                <button
-                onClick={onClose}
-                className="w-20 p-2 text-black rounded"
-                style={{ backgroundColor: "rgba(100, 100, 100, 0.5)" }}
-                >
-                Hủy
-                </button>
-                <button
-                onClick={handleSearch}
-                className="w-20 p-2 bg-primary text-white rounded"
-                style={{ background: "#0068ff", minWidth: "100px"}}
-                >
-                Tìm kiếm
-                </button>
-            </div>
+          <hr className="border-t border-gray-300 mb-4" />
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={onClose}
+              className="w-20 p-2 text-black rounded"
+              style={{ backgroundColor: "rgba(100, 100, 100, 0.5)" }}
+            >
+              Hủy
+            </button>
+            <button
+              onClick={handleSearch}
+              className="w-20 p-2 bg-primary text-white rounded"
+              style={{ background: "#0068ff", minWidth: "100px" }}
+            >
+              Tìm kiếm
+            </button>
+          </div>
         </div>
       </div>
     </div>

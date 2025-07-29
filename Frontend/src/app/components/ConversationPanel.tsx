@@ -39,36 +39,35 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
   const { isLoggedIn, user } = useAuth();
   const router = useRouter();
 
+  const fetchConversations = async () => {
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
+      const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations/user', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const fetchedConversations: Conversation[] = response.data.map((conv: ConversationApiResponse) => ({
+        id: conv.conversationId.toString(),
+        name: conv.name,
+        preview: conv.preview,
+        time: new Date(conv.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        unread: conv.unreadCount,
+        online: false,
+        avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
+      }));
+      setConversations(fetchedConversations.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()));
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+    }
+  };
+
   useEffect(() => {
     if (!isLoggedIn || !user) {
       router.push('/auth/login');
       return;
     }
-
-    const fetchConversations = async () => {
-      try {
-        const accessToken = localStorage.getItem('accessToken');
-        if (!accessToken) {
-          throw new Error('No access token found');
-        }
-        const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations/user', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        const fetchedConversations: Conversation[] = response.data.map((conv: ConversationApiResponse) => ({
-          id: conv.conversationId.toString(),
-          name: conv.name,
-          preview: conv.preview,
-          time: new Date(conv.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          unread: conv.unreadCount,
-          online: false,
-          avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
-        }));
-        setConversations(fetchedConversations.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()));
-      } catch (error) {
-        console.error('Error fetching conversations:', error);
-      }
-    };
-
     fetchConversations();
   }, [isLoggedIn, user, router]);
 
@@ -133,20 +132,45 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       alert('Nhóm đã được tạo!');
-      const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations/user', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      setConversations(response.data.map((conv: ConversationApiResponse) => ({
-        id: conv.conversationId.toString(),
-        name: conv.name,
-        preview: conv.preview,
-        time: new Date(conv.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        unread: conv.unreadCount,
-        online: false,
-        avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
-      })));
+      await fetchConversations();
     } catch (error) {
       console.error('Error creating group:', error);
+    }
+  };
+
+  const handleStartChat = async (convId: number) => {
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
+      // Fetch the updated conversation list
+      await fetchConversations();
+      // Select the new conversation
+      const selectedConv = conversations.find((conv) => conv.id === convId.toString());
+      if (selectedConv) {
+        setSelectedConversationId(convId.toString());
+        onSelectConversation(selectedConv);
+      } else {
+        // If the conversation is not in the list yet, fetch it explicitly
+        const response = await axios.get<ConversationApiResponse>(`http://localhost:5130/api/conversations/${convId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const newConv: Conversation = {
+          id: response.data.conversationId.toString(),
+          name: response.data.name,
+          preview: response.data.preview,
+          time: new Date(response.data.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          unread: response.data.unreadCount,
+          online: false,
+          avatarUrl: response.data.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
+        };
+        setConversations([...conversations, newConv].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()));
+        setSelectedConversationId(convId.toString());
+        onSelectConversation(newConv);
+      }
+    } catch {
+      
     }
   };
 
@@ -221,6 +245,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         isOpen={isAddFriendModalOpen}
         onClose={() => setIsAddFriendModalOpen(false)}
         onAddFriend={handleAddFriend}
+        onStartChat={handleStartChat}
       />
     </div>
   );
