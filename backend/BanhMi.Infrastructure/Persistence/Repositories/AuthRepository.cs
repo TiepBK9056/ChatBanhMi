@@ -53,7 +53,7 @@ public class AuthRepository : IAuthRepository
     }
     public async Task AddUserAsync(User user)
     {
-        if(user == null)
+        if (user == null)
             throw new ArgumentNullException(nameof(user), "Không thể thêm user vì user là null!");
 
         await _dbContext.Users.AddAsync(user);
@@ -79,4 +79,15 @@ public class AuthRepository : IAuthRepository
     {
         return await _dbContext.Users.FirstOrDefaultAsync(u => u.Role == role);
     }
+    public async Task RevokeRefreshTokenAsync(string token)
+    {
+        var existingToken = await _dbContext.RefreshTokens
+            .FirstOrDefaultAsync(t => t.Token == token);
+        if (existingToken != null)
+        {
+            existingToken.RevokedAt = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+        }
+    }
+    
 }

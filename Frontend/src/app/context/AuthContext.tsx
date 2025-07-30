@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { useRouter } from 'next/navigation';
 
 interface User {
   userId: number;
@@ -21,20 +22,25 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true); // Thêm isLoading
+  const router = useRouter();
 
   const refreshToken = useCallback(async () => {
     if (typeof window === "undefined") {
       setIsLoggedIn(false);
       setUser(null);
+      setIsLoading(false);
       return;
     }
     const refreshToken = localStorage.getItem("refreshToken");
     if (!refreshToken) {
       setIsLoggedIn(false);
       setUser(null);
+      setIsLoading(false);
       localStorage.removeItem("cart");
       localStorage.removeItem("isCartMerged");
       localStorage.removeItem("lastSyncedCart");
+      router.push('/auth/login');
       return;
     }
 
@@ -70,14 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           throw new Error("Failed to fetch user data after refresh");
         }
       } else {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("tokenExpiry");
-        localStorage.removeItem("isCartMerged");
-        localStorage.removeItem("cart");
-        localStorage.removeItem("lastSyncedCart");
-        setIsLoggedIn(false);
-        setUser(null);
+        throw new Error("Refresh token failed");
       }
     } catch (error) {
       console.error("Refresh token error:", error);
@@ -89,8 +88,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.removeItem("lastSyncedCart");
       setIsLoggedIn(false);
       setUser(null);
+      router.push('/auth/login');
+    } finally {
+      setIsLoading(false);
     }
-  }, []);
+  }, [router]);
 
   const fetchUserData = useCallback(
     async (accessToken: string) => {
@@ -123,7 +125,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      setIsLoading(false);
+      return;
+    }
 
     const checkAuth = async () => {
       const accessToken = localStorage.getItem("accessToken");
@@ -139,7 +144,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         localStorage.removeItem("lastSyncedCart");
         setIsLoggedIn(false);
         setUser(null);
+        router.push('/auth/login');
       }
+      setIsLoading(false);
     };
 
     checkAuth();
@@ -150,7 +157,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const timer = setTimeout(() => refreshToken(), timeout > 0 ? timeout : 0);
       return () => clearTimeout(timer);
     }
-  }, [fetchUserData, refreshToken]);
+  }, [fetchUserData, refreshToken, router]);
 
   const login = async (email: string, password: string) => {
     if (typeof window === "undefined") throw new Error("Cannot login on server-side");
@@ -172,6 +179,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("tokenExpiry", (Date.now() + data.expiresIn * 1000).toString());
 
       await fetchUserData(data.accessToken);
+      router.push('/chat');
     } catch (error) {
       console.error("Login error:", error);
       throw error;
@@ -202,7 +210,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem("lastSyncedCart");
     setIsLoggedIn(false);
     setUser(null);
+    router.push('/auth/login');
   };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <AuthContext.Provider value={{ isLoggedIn, user, login, logout }}>

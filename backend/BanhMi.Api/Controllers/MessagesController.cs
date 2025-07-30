@@ -63,9 +63,10 @@ namespace BanhMi.Api.Controllers
             }
         }
 
-        
+
 
         [HttpPost("{messageId}/read")]
+        [Authorize]
         public async Task<IActionResult> MarkMessageAsRead(int messageId)
         {
             var command = new MarkMessageAsReadCommand { MessageId = messageId }; // Giả định có command này

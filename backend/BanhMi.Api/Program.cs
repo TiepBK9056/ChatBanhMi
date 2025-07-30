@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using BanhMi.Api.Hubs;
 using BanhMi.API.Filters;
@@ -51,14 +52,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", builder =>
+    options.AddPolicy("AllowFrontend", builder =>
     {
-        builder.AllowAnyOrigin() 
-               .AllowAnyMethod() 
-               .AllowAnyHeader(); 
+        builder.WithOrigins("http://localhost:3000") // Chỉ định origin cụ thể
+               .AllowAnyMethod()
+               .AllowAnyHeader()
+               .AllowCredentials(); // Thêm AllowCredentials cho SignalR
     });
 });
-
 // register
 builder.Services.AddScoped<RegisterCommandHandler>();
 builder.Services.AddScoped<LoginCommandHandler>();
@@ -70,6 +71,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IRedisService, RedisService>();
+
 
 // Add the ICurrentUserService registration
 builder.Services.AddHttpContextAccessor();
@@ -132,8 +134,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]
                                 ?? throw new InvalidOperationException("JWT Key không được cấu hình!"))),
-            NameClaimType = JwtRegisteredClaimNames.Sub                    
-        }; 
+            NameClaimType = ClaimTypes.NameIdentifier
+        };
+
+        // Thêm logic đọc access_token từ query string
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    context.Token = accessToken;
+                }
+                else
+                {
+                    Console.WriteLine("[Debug] No access_token found in query string");
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -162,7 +182,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

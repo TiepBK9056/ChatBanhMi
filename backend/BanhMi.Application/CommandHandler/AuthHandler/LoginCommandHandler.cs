@@ -36,7 +36,7 @@ public class LoginCommandHandler
 
             var accessToken = _tokenService.GenerateAccessToken(user);
             var refreshToken = await _tokenService.GenerateRefreshToken(user.Id);
-            await _authRepository.AddRefreshTokenAsync(refreshToken);
+            
 
             _logger.LogInformation("User logged in: {Email}", dto.Email);
             return Result<LoginResponseDto>.Success(new LoginResponseDto
