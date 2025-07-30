@@ -5,6 +5,7 @@ import * as signalR from '@microsoft/signalr';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import debounce from 'lodash/debounce';
+import { initializeSignalRConnection} from '../service/signalRService';
 
 interface Message {
   messageId: number;
@@ -13,6 +14,7 @@ interface Message {
   content: string;
   createdAt: Date;
   isRead: boolean;
+  isTemp?: boolean;
 }
 
 interface Conversation {
@@ -48,37 +50,24 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
       return;
     }
 
-    console.log('[ChatArea] Starting SignalR connection with token:', accessToken.substring(0, 10) + '...');
+    let isMounted = true;
 
-    const newConnection = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5130/chatHub', {
-        accessTokenFactory: () => accessToken,
-        logger: signalR.LogLevel.Debug,
-        transport: signalR.HttpTransportType.WebSockets,
-      })
-      .withAutomaticReconnect([0, 2000, 5000, 10000])
-      .build();
+    const initConnection = async () => {
+      try {
+        const conn = await initializeSignalRConnection(accessToken);
+        if (isMounted) {
+          setConnection(conn);
+        }
+      } catch  {
+        // Không cần toast ở đây vì signalRService đã xử lý
+      }
+    };
 
-    setConnection(newConnection);
-
-    newConnection
-      .start()
-      .then(() => {
-        console.log('[ChatArea] SignalR connected successfully. ConnectionId:', newConnection.connectionId);
-      })
-      .catch(err => {
-        console.error('[ChatArea] SignalR Connection Error:', err);
-        toast.error(`Không thể kết nối SignalR: ${err.message}`);
-      });
-
-    newConnection.onclose((error) => {
-      console.error('[ChatArea] SignalR connection closed:', error);
-      toast.error('Mất kết nối với server, đang thử kết nối lại...');
-    });
+    initConnection();
 
     return () => {
-      console.log('[ChatArea] Cleaning up SignalR connection');
-      newConnection.stop().catch(err => console.error('[ChatArea] Error stopping SignalR:', err));
+      isMounted = false;
+      // Không stop kết nối ở đây vì signalRService quản lý
     };
   }, [isLoggedIn, user]);
 
@@ -114,7 +103,8 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
           await connection.invoke('MarkMessageAsRead', convId, msg.messageId);
           console.log('[ChatArea] Marked message as read:', msg.messageId);
         } catch (err) {
-          console.error('[ChatArea] SignalR MarkMessageAsRead Error:', err);
+          const errorMessage = err instanceof Error ? err.message : 'Lỗi không xác định';
+          console.error('[ChatArea] SignalR MarkMessageAsRead Error:', errorMessage);
           await axios.post(
             `http://localhost:5130/api/Messages/${msg.messageId}/read`,
             {},
@@ -125,17 +115,19 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
       }
     } catch (error) {
       console.error('[ChatArea] Error marking messages as read:', error);
+      toast.error('Không thể đánh dấu tin nhắn đã đọc');
     }
   }, [connection, user, messages]);
 
   // Xử lý khi chọn conversation
   useEffect(() => {
-    if (!selectedConversation || !connection || !isLoggedIn || !user) {
-      console.log('[ChatArea] Missing required data:', {
+    if (!selectedConversation || !connection || !isLoggedIn || !user || connection.state !== signalR.HubConnectionState.Connected) {
+      console.log('[ChatArea] Missing required data or connection not established:', {
         selectedConversation: !!selectedConversation,
         connection: !!connection,
         isLoggedIn,
         user: !!user,
+        connectionState: connection?.state,
       });
       return;
     }
@@ -149,30 +141,36 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
         return;
       }
 
-      if (connection.state === signalR.HubConnectionState.Connected) {
-        try {
-          await connection.invoke('JoinConversation', convId);
-          console.log('[ChatArea] Joined conversation:', convId);
-          isConversationInitialized.current.set(convId, true);
-          await fetchMessages(convId);
-          if (messages.some(m => !m.isRead && m.senderId !== user?.userId)) {
-            await markMessagesAsRead(convId);
-          }
-        } catch (err) {
-          console.error('[ChatArea] JoinConversation Error:', err);
-          toast.error('Không thể tham gia cuộc hội thoại');
+      try {
+        await connection.invoke('JoinConversation', convId);
+        console.log('[ChatArea] Joined conversation:', convId);
+        isConversationInitialized.current.set(convId, true);
+        await fetchMessages(convId);
+        if (messages.some(m => !m.isRead && m.senderId !== user?.userId)) {
+          await markMessagesAsRead(convId);
         }
-      } else {
-        console.log('[ChatArea] SignalR not connected, skipping JoinConversation');
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Lỗi không xác định';
+        console.error('[ChatArea] JoinConversation Error:', errorMessage);
+        toast.error('Không thể tham gia cuộc hội thoại');
       }
     };
 
     initializeConversation();
 
+    console.log('[ChatArea] Registering ReceiveMessage event');
     connection.on('ReceiveMessage', (message: Message) => {
       console.log('[ChatArea] Received message:', message);
       setMessages(prev => {
-        // Tránh thêm tin nhắn trùng lặp
+        const tempIndex = prev.findIndex(
+          msg => msg.isTemp && msg.senderId === message.senderId && msg.content === message.content && Math.abs(msg.createdAt.getTime() - new Date(message.createdAt).getTime()) < 1000
+        );
+        if (tempIndex !== -1) {
+          const newMessages = [...prev];
+          newMessages[tempIndex] = { ...message, createdAt: new Date(message.createdAt) };
+          console.log('[ChatArea] Replaced temp message with server message:', newMessages);
+          return newMessages;
+        }
         if (prev.some(msg => msg.messageId === message.messageId)) {
           console.log('[ChatArea] Message already exists, skipping:', message.messageId);
           return prev;
@@ -198,9 +196,10 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
     return () => {
       if (connection && connection.state === signalR.HubConnectionState.Connected) {
         console.log('[ChatArea] Leaving conversation:', convId);
-        connection.invoke('LeaveConversation', convId).catch(err =>
-          console.error('[ChatArea] LeaveConversation Error:', err)
-        );
+        connection.invoke('LeaveConversation', convId).catch(err => {
+          const errorMessage = err instanceof Error ? err.message : 'Lỗi không xác định';
+          console.error('[ChatArea] LeaveConversation Error:', errorMessage);
+        });
         connection.off('ReceiveMessage');
         connection.off('MessageRead');
         connection.off('TypingIndicator');
@@ -217,37 +216,37 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
 
   // Gửi tin nhắn
   const handleSendMessage = async () => {
-    if (!newMessage || !selectedConversation || !connection || !isLoggedIn || !user) {
+    if (!newMessage || !selectedConversation || !connection || !isLoggedIn || !user || connection.state !== signalR.HubConnectionState.Connected) {
       console.log('[ChatArea] Cannot send message:', {
         newMessage: !!newMessage,
         selectedConversation: !!selectedConversation,
         connection: !!connection,
         isLoggedIn,
         user: !!user,
+        connectionState: connection?.state,
       });
       return;
     }
 
-    // Khai báo tempMessage ở phạm vi ngoài try...catch
     const tempMessage: Message = {
-      messageId: Date.now(), // ID tạm thời
+      messageId: Date.now(),
       conversationId: parseInt(selectedConversation.id),
       senderId: user.userId,
       content: newMessage,
       createdAt: new Date(),
       isRead: false,
+      isTemp: true,
     };
 
     try {
       console.log('[ChatArea] Sending message to conversation:', selectedConversation.id);
-      // Thêm tin nhắn tạm thời vào state
       setMessages(prev => [...prev, tempMessage]);
       await connection.invoke('SendMessage', parseInt(selectedConversation.id), newMessage);
       setNewMessage('');
     } catch (error) {
-      console.error('[ChatArea] Error sending message:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
+      console.error('[ChatArea] Error sending message:', errorMessage);
       toast.error('Không thể gửi tin nhắn');
-      // Xóa tin nhắn tạm thời nếu gửi thất bại
       setMessages(prev => prev.filter(msg => msg.messageId !== tempMessage.messageId));
     }
   };
@@ -260,7 +259,8 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
           console.log('[ChatArea] Sending typing indicator for conversation:', convId);
           await connection.invoke('Typing', convId, isTyping);
         } catch (error) {
-          console.error('[ChatArea] Typing Error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
+          console.error('[ChatArea] Typing Error:', errorMessage);
         }
       }
     }, 500),
@@ -273,6 +273,8 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
       debouncedTyping(parseInt(selectedConversation.id), e.target.value.length > 0);
     }
   };
+
+  console.log('[ChatArea] Rendering messages:', messages);
 
   if (!selectedConversation) {
     return (
@@ -303,7 +305,7 @@ export default function ChatArea({ selectedConversation }: ChatAreaProps) {
           <div key={msg.messageId} className={`message ${msg.senderId === user?.userId ? 'sent' : 'received'}`}>
             <div>{msg.content}</div>
             <div className="text-xs text-gray-500">
-              {msg.createdAt.toLocaleTimeString('vi-VN')} {msg.isRead ? '(Đã đọc)' : ''}
+              {msg.createdAt.toLocaleTimeString('vi-VN')} {msg.isRead ? '(Đã đọc)' : ''} {msg.isTemp ? '(Tạm thời)' : ''}
             </div>
           </div>
         ))}

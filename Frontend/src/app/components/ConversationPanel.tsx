@@ -1,11 +1,12 @@
 import { FaSearch, FaUserPlus, FaUserFriends } from 'react-icons/fa';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import * as signalR from '@microsoft/signalr';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import AddFriendModal from './AddFriendModal';
 import toast from 'react-hot-toast';
+import { initializeSignalRConnection, getSignalRConnection } from '../service/signalRService';
 
 interface Conversation {
   id: string;
@@ -50,23 +51,24 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
   const router = useRouter();
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
 
-  // Hàm fetchConversations được định nghĩa ở phạm vi component
-  const fetchConversations = async () => {
+  // Hàm fetchConversations
+  const fetchConversations = useCallback(async () => {
     try {
       const accessToken = localStorage.getItem('accessToken');
       if (!accessToken) throw new Error('No access token found');
 
-      console.log('[ConversationPanel] Fetching conversations');
+      console.log('[ConversationPanel] Fetching conversations for user:', user?.userId);
       const response = await axios.get<ConversationApiResponse[]>('http://localhost:5130/api/conversations/user', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
 
+      console.log('[ConversationPanel] API response:', response.data);
       const fetchedConversations: Conversation[] = response.data.map((conv: ConversationApiResponse) => ({
         id: conv.conversationId.toString(),
         name: conv.name,
-        preview: conv.preview,
+        preview: conv.preview || 'No messages yet',
         time: new Date(conv.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        unread: conv.unreadCount,
+        unread: conv.unreadCount || 0,
         online: false,
         avatarUrl: conv.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
       }));
@@ -74,13 +76,15 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
       console.log('[ConversationPanel] Conversations fetched:', fetchedConversations);
       setConversations(fetchedConversations.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()));
     } catch (error) {
-      console.error('[ConversationPanel] Error fetching conversations:', error);
-      toast.error('Không thể tải danh sách hội thoại');
+      const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
+      console.error('[ConversationPanel] Error fetching conversations:', errorMessage);
+      toast.error(`Không thể tải danh sách hội thoại: ${errorMessage}`);
     }
-  };
+  }, [user]);
 
   // Kết nối SignalR và xử lý conversations
   useEffect(() => {
+    console.log('[ConversationPanel] Auth state:', { isLoggedIn, user });
     if (!isLoggedIn || !user) {
       console.log('[ConversationPanel] User not logged in or user data missing');
       router.push('/auth/login');
@@ -88,6 +92,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
     }
 
     const accessToken = localStorage.getItem('accessToken');
+    console.log('[ConversationPanel] Access token:', accessToken?.substring(0, 10) + '...');
     if (!accessToken) {
       console.log('[ConversationPanel] No access token found in localStorage');
       toast.error('Chưa đăng nhập');
@@ -95,41 +100,27 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
       return;
     }
 
-    console.log('[ConversationPanel] Starting SignalR connection with token:', accessToken.substring(0, 10) + '...');
+    // Gọi fetchConversations ngay lập tức
+    fetchConversations();
 
-    const newConnection = new signalR.HubConnectionBuilder()
-      .withUrl('http://localhost:5130/chatHub', {
-        accessTokenFactory: () => accessToken, // Gửi token qua header Authorization
-        logger: signalR.LogLevel.Debug,
-      })
-      .withAutomaticReconnect()
-      .build();
+    let isMounted = true;
 
-    setConnection(newConnection);
-
-    const initialize = async () => {
+    const initConnection = async () => {
       try {
-        await newConnection.start();
-        console.log('[ConversationPanel] SignalR connected successfully. ConnectionId:', newConnection.connectionId);
-        await fetchConversations(); // Gọi hàm fetchConversations đã định nghĩa
-        if (newConnection.state === signalR.HubConnectionState.Connected) {
-          conversations.forEach(conv => {
-            console.log('[ConversationPanel] Joining conversation:', conv.id);
-            newConnection.invoke('JoinConversation', parseInt(conv.id)).catch(err => 
-              console.error('[ConversationPanel] JoinConversation Error:', err)
-            );
-          });
+        const conn = await initializeSignalRConnection(accessToken);
+        if (isMounted) {
+          setConnection(conn);
         }
-      } catch (err) {
-        console.error('[ConversationPanel] SignalR Connection Error:', err);
-        toast.error(`Không thể kết nối SignalR:`);
+      } catch  {
+        // Không cần toast ở đây vì signalRService đã xử lý
       }
     };
 
-    initialize();
+    initConnection();
 
-    if (newConnection) {
-      newConnection.on('ReceiveMessage', (message: Message) => {
+    const conn = getSignalRConnection();
+    if (conn) {
+      conn.on('ReceiveMessage', (message: Message) => {
         console.log('[ConversationPanel] Received message:', message);
         setConversations(prev =>
           prev.map(conv =>
@@ -145,7 +136,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         );
       });
 
-      newConnection.on('MessageRead', () => {
+      conn.on('MessageRead', () => {
         console.log('[ConversationPanel] Message read event received');
         setConversations(prev =>
           prev.map(conv =>
@@ -156,14 +147,35 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
     }
 
     return () => {
-      if (newConnection) {
-        console.log('[ConversationPanel] Cleaning up SignalR connection');
-        newConnection.off('ReceiveMessage');
-        newConnection.off('MessageRead');
-        newConnection.stop().catch(err => console.error('[ConversationPanel] Error stopping SignalR:', err));
+      isMounted = false;
+    };
+  }, [isLoggedIn, user, router, fetchConversations]);
+
+  // Tham gia conversations khi có danh sách conversations
+  useEffect(() => {
+    if (!connection || connection.state !== signalR.HubConnectionState.Connected || !conversations.length) {
+      console.log('[ConversationPanel] Skipping join conversations:', {
+        connection: !!connection,
+        connectionState: connection?.state,
+        conversationsLength: conversations.length,
+      });
+      return;
+    }
+
+    const joinConversations = async () => {
+      for (const conv of conversations) {
+        try {
+          console.log('[ConversationPanel] Joining conversation:', conv.id);
+          await connection.invoke('JoinConversation', parseInt(conv.id));
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : 'Lỗi không xác định';
+          console.error('[ConversationPanel] JoinConversation Error:', errorMessage);
+        }
       }
     };
-  }, [isLoggedIn, user, router]);
+
+    joinConversations();
+  }, [connection, conversations]);
 
   const filteredConversations = selectedTab === 'Tất cả'
     ? conversations.filter((conv) =>
@@ -207,9 +219,9 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
       );
       toast.success('Yêu cầu kết bạn đã được gửi!');
     } catch (error) {
-      console.error('[ConversationPanel] Error adding friend:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
+      console.error('[ConversationPanel] Error adding friend:', errorMessage);
       toast.error('Không thể gửi yêu cầu kết bạn');
-      throw error;
     }
   };
 
@@ -234,10 +246,11 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         { conversationName: groupName, isGroup: true, participantIds: [...participantIds, user.userId] },
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      await fetchConversations(); // Gọi hàm fetchConversations đã định nghĩa
+      await fetchConversations();
       toast.success('Nhóm đã được tạo!');
     } catch (error) {
-      console.error('[ConversationPanel] Error creating group:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
+      console.error('[ConversationPanel] Error creating group:', errorMessage);
       toast.error('Không thể tạo nhóm');
     }
   };
@@ -248,7 +261,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
       if (!accessToken) throw new Error('No access token found');
 
       console.log('[ConversationPanel] Starting chat for conversation:', convId);
-      await fetchConversations(); // Gọi hàm fetchConversations đã định nghĩa
+      await fetchConversations();
       const selectedConv = conversations.find((conv) => conv.id === convId.toString());
       if (selectedConv) {
         setSelectedConversationId(convId.toString());
@@ -261,9 +274,9 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         const newConv: Conversation = {
           id: response.data.conversationId.toString(),
           name: response.data.name,
-          preview: response.data.preview,
+          preview: response.data.preview || 'No messages yet',
           time: new Date(response.data.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          unread: response.data.unreadCount,
+          unread: response.data.unreadCount || 0,
           online: false,
           avatarUrl: response.data.avatarUrl ?? 'https://s120-ava-talk.zadn.vn/2/0/3/8/3/120/122e957f96878f6a59f77aec2f6b7c09.jpg',
         };
@@ -273,14 +286,20 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         onSelectConversation(newConv);
         if (connection && connection.state === signalR.HubConnectionState.Connected) {
           console.log('[ConversationPanel] Joining new conversation:', convId);
-          connection.invoke('JoinConversation', convId).catch(err => console.error('[ConversationPanel] JoinConversation Error:', err));
+          connection.invoke('JoinConversation', convId).catch(err => {
+            const errorMessage = err instanceof Error ? err.message : 'Lỗi không xác định';
+            console.error('[ConversationPanel] JoinConversation Error:', errorMessage);
+          });
         }
       }
     } catch (error) {
-      console.error('[ConversationPanel] Error handling start chat:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
+      console.error('[ConversationPanel] Error handling start chat:', errorMessage);
       toast.error('Không thể chọn cuộc hội thoại');
     }
   };
+
+  console.log('[ConversationPanel] Rendering conversations:', conversations);
 
   return (
     <div id="convPanel" className="flex flex-col bg-sidebar transition-all duration-300">
@@ -323,31 +342,35 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
       </div>
       <div className="divider"></div>
       <div className="conv-list flex-1 overflow-y-auto">
-        {filteredConversations.map((conv) => (
-          <div
-            key={conv.id}
-            className={`conv-item animate-fadeIn ${selectedConversationId === conv.id ? 'selected' : ''}`}
-            data-id={conv.id}
-            onClick={() => handleSelectConversation(conv.id)}
-          >
-            <div className="conv-avatar">
-              <img
-                alt="Avatar"
-                src={conv.avatarUrl}
-                className="avatar-img"
-              />
-              {conv.online && <div className="conv-status online"></div>}
+        {filteredConversations.length === 0 ? (
+          <div className="text-center text-gray-500">Không có cuộc hội thoại nào</div>
+        ) : (
+          filteredConversations.map((conv) => (
+            <div
+              key={conv.id}
+              className={`conv-item animate-fadeIn ${selectedConversationId === conv.id ? 'selected' : ''}`}
+              data-id={conv.id}
+              onClick={() => handleSelectConversation(conv.id)}
+            >
+              <div className="conv-avatar">
+                <img
+                  alt="Avatar"
+                  src={conv.avatarUrl}
+                  className="avatar-img"
+                />
+                {conv.online && <div className="conv-status online"></div>}
+              </div>
+              <div className="conv-info">
+                <div className="conv-name">{conv.name}</div>
+                <div className="conv-preview">{conv.preview}</div>
+              </div>
+              <div className="conv-meta">
+                <div className="conv-time">{conv.time}</div>
+                {conv.unread > 0 && <div className="conv-badge">{conv.unread}</div>}
+              </div>
             </div>
-            <div className="conv-info">
-              <div className="conv-name">{conv.name}</div>
-              <div className="conv-preview">{conv.preview}</div>
-            </div>
-            <div className="conv-meta">
-              <div className="conv-time">{conv.time}</div>
-              {conv.unread > 0 && <div className="conv-badge">{conv.unread}</div>}
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
       <AddFriendModal
         isOpen={isAddFriendModalOpen}
