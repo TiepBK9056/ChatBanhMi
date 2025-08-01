@@ -1,212 +1,176 @@
 "use client";
 
 import React, { useState } from "react";
-import SocialLogin from "@/app/auth/components/SocialLoginButton";
+import { useRouter } from "next/navigation";
 
 function RegisterForm() {
-    const [firstName, setFirstName] = useState("");
-    const [lastName, setLastName] = useState("");
-    const [email, setEmail] = useState("");
-    const [phoneNumber, setPhoneNumber] = useState("");
-    const [password, setPassword] = useState("");
-    const [formError, setFormError] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [password, setPassword] = useState("");
+  const [formError, setFormError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
-    const handleFirstNameChange = (event: React.ChangeEvent<HTMLInputElement>) => setFirstName(event.target.value);
-    const handleLastNameChange = (event: React.ChangeEvent<HTMLInputElement>) => setLastName(event.target.value);
-    const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => setEmail(event.target.value);
-    const handlePhoneNumberChange = (event: React.ChangeEvent<HTMLInputElement>) => setPhoneNumber(event.target.value);
-    const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => setPassword(event.target.value);
+  const handleFirstNameChange = (event: React.ChangeEvent<HTMLInputElement>) => setFirstName(event.target.value);
+  const handleLastNameChange = (event: React.ChangeEvent<HTMLInputElement>) => setLastName(event.target.value);
+  const handleEmailChange = (event: React.ChangeEvent<HTMLInputElement>) => setEmail(event.target.value);
+  const handlePhoneNumberChange = (event: React.ChangeEvent<HTMLInputElement>) => setPhoneNumber(event.target.value);
+  const handlePasswordChange = (event: React.ChangeEvent<HTMLInputElement>) => setPassword(event.target.value);
 
-    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        setFormError("");
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFormError("");
 
-        if (!firstName || !lastName || !email || !phoneNumber || !password) {
-            setFormError("Vui lòng điền đầy đủ thông tin.");
-            return;
-        }
+    if (!firstName || !lastName || !email || !phoneNumber || !password) {
+      setFormError("Vui lòng điền đầy đủ thông tin.");
+      return;
+    }
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            setFormError("Email không hợp lệ.");
-            return;
-        }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setFormError("Email không hợp lệ.");
+      return;
+    }
 
-        setIsLoading(true);
+    setIsLoading(true);
 
-        try {
-            console.time("API Call");
-            const response = await fetch("http://localhost:5130/api/auth/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    firstName,
-                    lastName,
-                    email,
-                    phoneNumber,
-                    password,
-                }),
-            });
-            console.timeEnd("API Call");
+    try {
+      console.time("API Call");
+      const response = await fetch("http://localhost:5130/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          phoneNumber,
+          password,
+        }),
+      });
+      console.timeEnd("API Call");
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                setFormError(errorData.message || errorData.error || "Đã xảy ra lỗi khi đăng ký.");
-                setIsLoading(false);
-                return;
-            }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        setFormError(errorData.message || errorData.error || "Đã xảy ra lỗi khi đăng ký.");
+        setIsLoading(false);
+        return;
+      }
 
-            const result = await response.json();
-            console.log("Registration result:", result);
+      const result = await response.json();
+      console.log("Registration result:", result);
 
-            setFirstName("");
-            setLastName("");
-            setEmail("");
-            setPhoneNumber("");
-            setPassword("");
-            setIsLoading(false);
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPhoneNumber("");
+      setPassword("");
+      setIsLoading(false);
 
-            console.time("Redirect");
-            window.location.href = `/auth/confirmemail?email=${encodeURIComponent(email)}`;
-            console.timeEnd("Redirect");
-        } catch (error) {
-            console.error("Registration error:", error);
-            setFormError("Đã xảy ra lỗi khi đăng ký. Vui lòng thử lại sau.");
-            setIsLoading(false);
-        }
-    };
+      console.time("Redirect");
+      router.push(`/auth/confirmemail?email=${encodeURIComponent(email)}`);
+      console.timeEnd("Redirect");
+    } catch (error) {
+      console.error("Registration error:", error);
+      setFormError("Đã xảy ra lỗi khi đăng ký. Vui lòng thử lại sau.");
+      setIsLoading(false);
+    }
+  };
 
-    return (
-        <div id="login" className="section">
-            <form onSubmit={handleSubmit}>
-                <div className="form-signup clearfix">
-                    {formError && <div style={{ color: "red" }}>{formError}</div>}
-                    <div className="row">
-                        <div className="col-md-12 col-lg-12 col-sm-12 col-xs-12">
-                            <fieldset className="form-group">
-                                <input
-                                    type="text"
-                                    className="form-control form-control-lg"
-                                    value={lastName}
-                                    onChange={handleLastNameChange} // Đã sửa
-                                    name="lastName"
-                                    id="lastName"
-                                    placeholder="Họ"
-                                    required
-                                />
-                            </fieldset>
-                        </div>
-                        <div className="col-md-12 col-lg-12 col-sm-12 col-xs-12">
-                            <fieldset className="form-group">
-                                <input
-                                    type="text"
-                                    className="form-control form-control-lg"
-                                    value={firstName}
-                                    onChange={handleFirstNameChange} // Đã sửa
-                                    name="firstName"
-                                    id="firstName"
-                                    placeholder="Tên"
-                                    required
-                                />
-                            </fieldset>
-                        </div>
-                    </div>
-                    <div className="row">
-                        <div className="col-md-12 col-lg-12 col-sm-12 col-xs-12">
-                            <fieldset className="form-group">
-                                <input
-                                    type="email"
-                                    pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,63}$"
-                                    className="form-control form-control-lg"
-                                    value={email}
-                                    onChange={handleEmailChange}
-                                    name="email"
-                                    id="email"
-                                    placeholder="Email"
-                                    required
-                                />
-                            </fieldset>
-                        </div>
-                        <div className="col-md-12 col-lg-12 col-sm-12 col-xs-12">
-                            <fieldset className="form-group">
-                                <input
-                                    placeholder="Số điện thoại"
-                                    type="text"
-                                    pattern="\d+"
-                                    className="form-control form-control-comment form-control-lg"
-                                    value={phoneNumber}
-                                    onChange={handlePhoneNumberChange}
-                                    name="PhoneNumber"
-                                    required
-                                />
-                            </fieldset>
-                        </div>
-                        <div className="col-md-12 col-lg-12 col-sm-12 col-xs-12">
-                            <fieldset className="form-group">
-                                <input
-                                    type="password"
-                                    className="form-control form-control-lg"
-                                    value={password}
-                                    onChange={handlePasswordChange}
-                                    name="password"
-                                    id="password"
-                                    placeholder="Mật khẩu"
-                                    required
-                                />
-                            </fieldset>
-                        </div>
-                    </div>
-                    <div className="section">
-                        <button 
-                            type="submit" 
-                            className="btn btn-style btn_50"
-                            disabled={isLoading}
-                        >
-                            {isLoading ? "Đang xử lý..." : "Đăng ký"}
-                        </button>
-                    </div>
-                </div>
-            </form>
-            <SocialLogin />
-
-            {isLoading && (
-                <div 
-                    style={{
-                        position: "fixed",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: "100%",
-                        backgroundColor: "rgba(0, 0, 0, 0.5)",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        zIndex: 9999
-                    }}
-                >
-                    <div 
-                        style={{
-                            width: "50px",
-                            height: "50px",
-                            border: "5px solid #f3f3f3",
-                            borderTop: "5px solid #3498db",
-                            borderRadius: "50%",
-                            animation: "spin 1s linear infinite"
-                        }}
-                    />
-                </div>
-            )}
-            <style jsx>{`
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-            `}</style>
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {formError && <p className="text-red-500 text-sm text-center">{formError}</p>}
+        <div>
+          <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
+            Họ
+          </label>
+          <input
+            id="lastName"
+            type="text"
+            value={lastName}
+            onChange={handleLastNameChange}
+            placeholder="Nhập họ của bạn"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+            disabled={isLoading}
+          />
         </div>
-    );
+        <div>
+          <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
+            Tên
+          </label>
+          <input
+            id="firstName"
+            type="text"
+            value={firstName}
+            onChange={handleFirstNameChange}
+            placeholder="Nhập tên của bạn"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+            disabled={isLoading}
+          />
+        </div>
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={handleEmailChange}
+            placeholder="Nhập email của bạn"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+            disabled={isLoading}
+          />
+        </div>
+        <div>
+          <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+            Số điện thoại
+          </label>
+          <input
+            id="phoneNumber"
+            type="text"
+            value={phoneNumber}
+            onChange={handlePhoneNumberChange}
+            placeholder="Nhập số điện thoại của bạn"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+            disabled={isLoading}
+          />
+        </div>
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            Mật khẩu
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={handlePasswordChange}
+            placeholder="Nhập mật khẩu của bạn"
+            className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            required
+            disabled={isLoading}
+          />
+        </div>
+        <div className="flex justify-between items-center">
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-blue-400"
+            disabled={isLoading}
+          >
+            {isLoading ? "Đang xử lý..." : "Đăng ký"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
 }
 
 export default RegisterForm;

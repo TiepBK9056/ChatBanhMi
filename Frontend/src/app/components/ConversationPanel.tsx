@@ -5,6 +5,7 @@ import * as signalR from '@microsoft/signalr';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import AddFriendModal from './AddFriendModal';
+import CreateGroupModal from './CreateGroupModal'; // Import modal tạo nhóm
 import toast from 'react-hot-toast';
 import { initializeSignalRConnection, getSignalRConnection } from '../service/signalRService';
 
@@ -47,6 +48,7 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
+  const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false); // State cho modal tạo nhóm
   const { isLoggedIn, user } = useAuth();
   const router = useRouter();
   const [connection, setConnection] = useState<signalR.HubConnection | null>(null);
@@ -225,36 +227,6 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
     }
   };
 
-  const handleCreateGroup = async () => {
-    if (!isLoggedIn || !user) {
-      console.log('[ConversationPanel] Cannot create group: User not logged in');
-      router.push('/auth/login');
-      return;
-    }
-    const groupName = prompt('Nhập tên nhóm:');
-    const participantIdsInput = prompt('Nhập danh sách userId (cách nhau bởi dấu phẩy):');
-    if (!groupName || !participantIdsInput) return;
-
-    const participantIds = participantIdsInput.split(',').map(Number).filter(id => !isNaN(id));
-    try {
-      const accessToken = localStorage.getItem('accessToken');
-      if (!accessToken) throw new Error('No access token found');
-
-      console.log('[ConversationPanel] Creating group:', { groupName, participantIds });
-      await axios.post(
-        'http://localhost:5130/api/conversations',
-        { conversationName: groupName, isGroup: true, participantIds: [...participantIds, user.userId] },
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      await fetchConversations();
-      toast.success('Nhóm đã được tạo!');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
-      console.error('[ConversationPanel] Error creating group:', errorMessage);
-      toast.error('Không thể tạo nhóm');
-    }
-  };
-
   const handleStartChat = async (convId: number) => {
     try {
       const accessToken = localStorage.getItem('accessToken');
@@ -322,7 +294,11 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         >
           <FaUserPlus />
         </button>
-        <button className="input-btn" title="Tạo nhóm" onClick={handleCreateGroup}>
+        <button
+          className="input-btn"
+          title="Tạo nhóm"
+          onClick={() => setIsCreateGroupModalOpen(true)} // Mở modal tạo nhóm
+        >
           <FaUserFriends />
         </button>
       </div>
@@ -377,6 +353,35 @@ export default function ConversationPanel({ onSelectConversation }: Conversation
         onClose={() => setIsAddFriendModalOpen(false)}
         onAddFriend={handleAddFriend}
         onStartChat={handleStartChat}
+      />
+      <CreateGroupModal
+        isOpen={isCreateGroupModalOpen}
+        onClose={() => setIsCreateGroupModalOpen(false)} 
+        onCreateGroup={async (groupName: string, selectedMemberIds: number[]) => {
+          if (!isLoggedIn || !user) {
+            console.log('[ConversationPanel] Cannot create group: User not logged in');
+            router.push('/auth/login');
+            return;
+          }
+          try {
+            const accessToken = localStorage.getItem('accessToken');
+            if (!accessToken) throw new Error('No access token found');
+
+            console.log('[ConversationPanel] Creating group:', { groupName, selectedMemberIds });
+            await axios.post(
+              'http://localhost:5130/api/conversations',
+              { conversationName: groupName, isGroup: true, participantIds: [...selectedMemberIds, user.userId] },
+              { headers: { Authorization: `Bearer ${accessToken}` } }
+            );
+            await fetchConversations();
+            toast.success('Nhóm đã được tạo!');
+            setIsCreateGroupModalOpen(false); // Đóng modal sau khi tạo thành công
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
+            console.error('[ConversationPanel] Error creating group:', errorMessage);
+            toast.error('Không thể tạo nhóm');
+          }
+        }} // Callback để xử lý tạo nhóm
       />
     </div>
   );
